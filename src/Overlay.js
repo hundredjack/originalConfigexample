@@ -10,7 +10,7 @@ import {
 import { useSnapshot } from 'valtio'
 import { state } from './store'
 import { motion, AnimatePresence } from 'framer-motion'
-import { useRef, useState } from 'react'
+import { useRef, useState, useEffect } from 'react'
 import { useControls, folder, button } from 'leva'
 
 export default function Overlay() {
@@ -79,85 +79,87 @@ function Customizer({ config }) {
   const [showControls, setShowControls] = useState(false)
 
   // Setup Leva controls for custom image positioning
-  useControls({
-    'Custom Image Controls': folder({
-      'Position X': {
-        value: snap.decalPosition[0],
-        min: -1,
-        max: 1,
-        step: 0.01,
-        onChange: (value) => {
-          state.decalPosition[0] = value
-        },
-        disabled: !snap.useCustomImage
-      },
-      'Position Y': {
-        value: snap.decalPosition[1],
-        min: -1,
-        max: 1,
-        step: 0.01,
-        onChange: (value) => {
-          state.decalPosition[1] = value
-        },
-        disabled: !snap.useCustomImage
-      },
-      'Position Z': {
-        value: snap.decalPosition[2],
-        min: 0,
-        max: 0.5,
-        step: 0.01,
-        onChange: (value) => {
-          state.decalPosition[2] = value
-        },
-        disabled: !snap.useCustomImage
-      },
-      'Rotation X': {
-        value: snap.decalRotation[0],
-        min: -Math.PI,
-        max: Math.PI,
-        step: 0.01,
-        onChange: (value) => {
-          state.decalRotation[0] = value
-        },
-        disabled: !snap.useCustomImage
-      },
-      'Rotation Y': {
-        value: snap.decalRotation[1],
-        min: -Math.PI,
-        max: Math.PI,
-        step: 0.01,
-        onChange: (value) => {
-          state.decalRotation[1] = value
-        },
-        disabled: !snap.useCustomImage
-      },
-      'Rotation Z': {
-        value: snap.decalRotation[2],
-        min: -Math.PI,
-        max: Math.PI,
-        step: 0.01,
-        onChange: (value) => {
-          state.decalRotation[2] = value
-        },
-        disabled: !snap.useCustomImage
-      },
-      'Scale': {
-        value: snap.decalScale,
-        min: 0.05,
-        max: 0.5,
-        step: 0.01,
-        onChange: (value) => {
-          state.decalScale = value
-        },
-        disabled: !snap.useCustomImage
-      },
-      'Reset': button(() => {
-        state.decalPosition = [0, 0.04, 0.15]
-        state.decalRotation = [0, 0, 0]
-        state.decalScale = 0.15
+  useEffect(() => {
+    // Only setup controls when custom image is active
+    if (snap.useCustomImage) {
+      const { posX, posY, posZ, rotX, rotY, rotZ, scale } = useControls({
+        'Custom Image Controls': folder({
+          posX: {
+            value: snap.decalPosition[0],
+            min: -1,
+            max: 1,
+            step: 0.01,
+            onChange: (value) => {
+              state.decalPosition[0] = value
+            }
+          },
+          posY: {
+            value: snap.decalPosition[1],
+            min: -1,
+            max: 1,
+            step: 0.01,
+            onChange: (value) => {
+              state.decalPosition[1] = value
+            }
+          },
+          posZ: {
+            value: snap.decalPosition[2],
+            min: 0,
+            max: 0.5,
+            step: 0.01,
+            onChange: (value) => {
+              state.decalPosition[2] = value
+            }
+          },
+          rotX: {
+            value: snap.decalRotation[0],
+            min: -Math.PI,
+            max: Math.PI,
+            step: 0.01,
+            onChange: (value) => {
+              state.decalRotation[0] = value
+            }
+          },
+          rotY: {
+            value: snap.decalRotation[1],
+            min: -Math.PI,
+            max: Math.PI,
+            step: 0.01,
+            onChange: (value) => {
+              state.decalRotation[1] = value
+            }
+          },
+          rotZ: {
+            value: snap.decalRotation[2],
+            min: -Math.PI,
+            max: Math.PI,
+            step: 0.01,
+            onChange: (value) => {
+              state.decalRotation[2] = value
+            }
+          },
+          scale: {
+            value: snap.decalScale,
+            min: 0.05,
+            max: 0.5,
+            step: 0.01,
+            onChange: (value) => {
+              state.decalScale = value
+            }
+          },
+          'Reset Position': button(() => {
+            state.decalPosition = [0, 0.04, 0.15]
+            state.decalRotation = [0, 0, 0]
+            state.decalScale = 0.15
+          })
+        }, { collapsed: !showControls })
       })
-    }, { collapsed: !snap.useCustomImage })
-  })
+      
+      return () => {
+        // Cleanup
+      }
+    }
+  }, [snap.useCustomImage, showControls])
 
   const handleFileChange = (e) => {
     const file = e.target.files[0]
@@ -168,6 +170,7 @@ function Customizer({ config }) {
         img.onload = () => {
           state.customImage = img
           state.useCustomImage = true
+          setShowControls(true) // Automatically show controls when image is uploaded
         }
         img.src = event.target.result
       }
