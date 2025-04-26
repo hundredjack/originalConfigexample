@@ -13,6 +13,7 @@ import {
 } from '@react-three/drei'
 import { useSnapshot } from 'valtio'
 import { state } from './store'
+import * as THREE from 'three'
 
 export const App = ({ position = [0, 0, 2.5], fov = 25 }) => (
   <Canvas
@@ -36,7 +37,27 @@ export const App = ({ position = [0, 0, 2.5], fov = 25 }) => (
 function Shirt(props) {
   const snap = useSnapshot(state)
 
+  // Load the selected decal texture
   const texture = useTexture(`/${snap.selectedDecal}.png`)
+  
+  // Create a ref for the custom image texture
+  const customTextureRef = useRef(null)
+  
+  // Create a custom texture from the uploaded image if available
+  if (snap.isCustomImage && snap.customImage && !customTextureRef.current) {
+    const img = new Image()
+    img.src = snap.customImage
+    const customTexture = new THREE.Texture(img)
+    img.onload = () => {
+      customTexture.needsUpdate = true
+    }
+    customTextureRef.current = customTexture
+  }
+  
+  // Reset the custom texture when the custom image is removed
+  if (!snap.isCustomImage && customTextureRef.current) {
+    customTextureRef.current = null
+  }
 
   const { nodes, materials } = useGLTF('/shirt_baked_collapsed.glb')
 
@@ -52,14 +73,30 @@ function Shirt(props) {
       material-roughness={1}
       {...props}
       dispose={null}>
-      <Decal
-        position={[0, 0.04, 0.15]}
-        rotation={[0, 0, 0]}
-        scale={0.15}
-        opacity={0.7}
-        map={texture}
-        map-anisotropy={16}
-      />
+      
+      {/* Render the built-in decal if no custom image is selected */}
+      {!snap.isCustomImage && (
+        <Decal
+          position={[0, 0.04, 0.15]}
+          rotation={[0, 0, 0]}
+          scale={0.15}
+          opacity={0.7}
+          map={texture}
+          map-anisotropy={16}
+        />
+      )}
+      
+      {/* Render the custom image decal if available */}
+      {snap.isCustomImage && customTextureRef.current && (
+        <Decal
+          position={snap.customImagePosition}
+          rotation={snap.customImageRotation}
+          scale={snap.customImageScale}
+          opacity={0.9}
+          map={customTextureRef.current}
+          map-anisotropy={16}
+        />
+      )}
     </mesh>
   )
 }
