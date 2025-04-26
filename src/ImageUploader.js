@@ -40,6 +40,10 @@ const ImageUploader = () => {
 
   return (
     <div className="image-uploader">
+      <div className="uploader-instructions">
+        <p>Upload your own image or use our pre-made logos</p>
+        <p className="small-text">Use the controls panel to position, rotate, and scale your image</p>
+      </div>
       <input
         ref={fileInputRef}
         type="file"

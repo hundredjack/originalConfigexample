@@ -6,7 +6,7 @@ import { useControls, folder } from 'leva'
 const ImageControls = () => {
   const snap = useSnapshot(state)
 
-  // Only show controls if a custom image is uploaded
+  // Show controls for both custom images and built-in decals
   const { posX, posY, posZ, rotX, rotY, rotZ, scale } = useControls(
     'Image Controls',
     {
@@ -62,12 +62,11 @@ const ImageControls = () => {
 
   // Update state when controls change
   useEffect(() => {
-    if (snap.isCustomImage) {
-      state.customImagePosition = [posX, posY, posZ]
-      state.customImageRotation = [rotX, rotY, rotZ]
-      state.customImageScale = scale
-    }
-  }, [posX, posY, posZ, rotX, rotY, rotZ, scale, snap.isCustomImage])
+    // Apply controls to both custom images and built-in decals
+    state.customImagePosition = [posX, posY, posZ]
+    state.customImageRotation = [rotX, rotY, rotZ]
+    state.customImageScale = scale
+  }, [posX, posY, posZ, rotX, rotY, rotZ, scale])
 
   return null // This component doesn't render anything
 }
