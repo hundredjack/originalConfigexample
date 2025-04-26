@@ -77,6 +77,12 @@ function Customizer({ config }) {
   return (
     <motion.section {...config}>
       <div className="customizer">
+        {/* Image uploader component moved to the top */}
+        <ImageUploader />
+        
+        {/* Image controls component (invisible but functional) */}
+        {(snap.isCustomImage || snap.selectedDecal) && <ImageControls />}
+        
         <div className="color-options">
           {snap.colors.map((color) => (
             <div
@@ -96,18 +102,16 @@ function Customizer({ config }) {
                 onClick={() => {
                   state.selectedDecal = decal;
                   state.isCustomImage = false;
+                  // Set default position, rotation, and scale for the selected decal
+                  state.customImagePosition = [0, 0.04, 0.15];
+                  state.customImageRotation = [0, 0, 0];
+                  state.customImageScale = 0.15;
                 }}>
                 <img src={decal + '_thumb.png'} alt="brand" />
               </div>
             ))}
           </div>
         </div>
-        
-        {/* Image uploader component */}
-        <ImageUploader />
-        
-        {/* Image controls component (invisible but functional) */}
-        {snap.isCustomImage && <ImageControls />}
 
         <button
           className="share"
