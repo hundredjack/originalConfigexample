@@ -1,7 +1,7 @@
 #!/bin/bash
 
-# Auto-commit script
-# This script automatically commits changes to the repository
+# Manual-commit script
+# This script commits all changes to the repository
 
 # Check if there are any changes to commit
 if git diff-index --quiet HEAD --; then
@@ -13,7 +13,7 @@ fi
 git add .
 
 # Create a commit message with timestamp
-COMMIT_MESSAGE="Auto-commit: $(date)"
+COMMIT_MESSAGE="Manual commit: $(date)"
 
 # Commit the changes
 git commit -m "$COMMIT_MESSAGE"
