@@ -3,11 +3,15 @@ import {
   AiOutlineHighlight,
   AiOutlineShopping,
   AiFillCamera,
-  AiOutlineArrowLeft
+  AiOutlineArrowLeft,
+  AiOutlineUpload,
+  AiOutlineControl
 } from 'react-icons/ai'
 import { useSnapshot } from 'valtio'
 import { state } from './store'
 import { motion, AnimatePresence } from 'framer-motion'
+import { useRef, useState } from 'react'
+import { useControls, folder, button } from 'leva'
 
 export default function Overlay() {
   const snap = useSnapshot(state)
@@ -71,6 +75,113 @@ function Intro({ config }) {
 
 function Customizer({ config }) {
   const snap = useSnapshot(state)
+  const fileInputRef = useRef(null)
+  const [showControls, setShowControls] = useState(false)
+
+  // Setup Leva controls for custom image positioning
+  useControls({
+    'Custom Image Controls': folder({
+      'Position X': {
+        value: snap.decalPosition[0],
+        min: -1,
+        max: 1,
+        step: 0.01,
+        onChange: (value) => {
+          state.decalPosition[0] = value
+        },
+        disabled: !snap.useCustomImage
+      },
+      'Position Y': {
+        value: snap.decalPosition[1],
+        min: -1,
+        max: 1,
+        step: 0.01,
+        onChange: (value) => {
+          state.decalPosition[1] = value
+        },
+        disabled: !snap.useCustomImage
+      },
+      'Position Z': {
+        value: snap.decalPosition[2],
+        min: 0,
+        max: 0.5,
+        step: 0.01,
+        onChange: (value) => {
+          state.decalPosition[2] = value
+        },
+        disabled: !snap.useCustomImage
+      },
+      'Rotation X': {
+        value: snap.decalRotation[0],
+        min: -Math.PI,
+        max: Math.PI,
+        step: 0.01,
+        onChange: (value) => {
+          state.decalRotation[0] = value
+        },
+        disabled: !snap.useCustomImage
+      },
+      'Rotation Y': {
+        value: snap.decalRotation[1],
+        min: -Math.PI,
+        max: Math.PI,
+        step: 0.01,
+        onChange: (value) => {
+          state.decalRotation[1] = value
+        },
+        disabled: !snap.useCustomImage
+      },
+      'Rotation Z': {
+        value: snap.decalRotation[2],
+        min: -Math.PI,
+        max: Math.PI,
+        step: 0.01,
+        onChange: (value) => {
+          state.decalRotation[2] = value
+        },
+        disabled: !snap.useCustomImage
+      },
+      'Scale': {
+        value: snap.decalScale,
+        min: 0.05,
+        max: 0.5,
+        step: 0.01,
+        onChange: (value) => {
+          state.decalScale = value
+        },
+        disabled: !snap.useCustomImage
+      },
+      'Reset': button(() => {
+        state.decalPosition = [0, 0.04, 0.15]
+        state.decalRotation = [0, 0, 0]
+        state.decalScale = 0.15
+      })
+    }, { collapsed: !snap.useCustomImage })
+  })
+
+  const handleFileChange = (e) => {
+    const file = e.target.files[0]
+    if (file && file.type.match('image.*')) {
+      const reader = new FileReader()
+      reader.onload = (event) => {
+        const img = new Image()
+        img.onload = () => {
+          state.customImage = img
+          state.useCustomImage = true
+        }
+        img.src = event.target.result
+      }
+      reader.readAsDataURL(file)
+    }
+  }
+
+  const handleUploadClick = () => {
+    fileInputRef.current.click()
+  }
+
+  const toggleControls = () => {
+    setShowControls(!showControls)
+  }
 
   return (
     <motion.section {...config}>
@@ -91,12 +202,36 @@ function Customizer({ config }) {
               <div
                 key={decal}
                 className="decal"
-                onClick={() => (state.selectedDecal = decal)}>
+                onClick={() => {
+                  state.selectedDecal = decal
+                  state.useCustomImage = false
+                }}>
                 <img src={decal + '_thumb.png'} alt="brand" />
               </div>
             ))}
+            <div className="decal custom-upload" onClick={handleUploadClick}>
+              <AiOutlineUpload size="2em" />
+              <span>Upload</span>
+              <input 
+                type="file" 
+                ref={fileInputRef} 
+                style={{ display: 'none' }} 
+                accept="image/*"
+                onChange={handleFileChange}
+              />
+            </div>
           </div>
         </div>
+
+        {snap.useCustomImage && (
+          <button
+            className="control-button"
+            style={{ background: snap.selectedColor }}
+            onClick={toggleControls}>
+            {showControls ? 'HIDE CONTROLS' : 'SHOW CONTROLS'}
+            <AiOutlineControl size="1.3em" />
+          </button>
+        )}
 
         <button
           className="share"
