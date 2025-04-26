@@ -8,6 +8,8 @@ import {
 import { useSnapshot } from 'valtio'
 import { state } from './store'
 import { motion, AnimatePresence } from 'framer-motion'
+import ImageUploader from './ImageUploader'
+import ImageControls from './ImageControls'
 
 export default function Overlay() {
   const snap = useSnapshot(state)
@@ -91,12 +93,21 @@ function Customizer({ config }) {
               <div
                 key={decal}
                 className="decal"
-                onClick={() => (state.selectedDecal = decal)}>
+                onClick={() => {
+                  state.selectedDecal = decal;
+                  state.isCustomImage = false;
+                }}>
                 <img src={decal + '_thumb.png'} alt="brand" />
               </div>
             ))}
           </div>
         </div>
+        
+        {/* Image uploader component */}
+        <ImageUploader />
+        
+        {/* Image controls component (invisible but functional) */}
+        {snap.isCustomImage && <ImageControls />}
 
         <button
           className="share"
