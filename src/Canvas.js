@@ -75,11 +75,11 @@ function Shirt(props) {
       dispose={null}>
       
       {/* Render the built-in decal if no custom image is selected */}
-      {!snap.isCustomImage && (
+      {!snap.isCustomImage && snap.selectedDecal && (
         <Decal
-          position={[0, 0.04, 0.15]}
-          rotation={[0, 0, 0]}
-          scale={0.15}
+          position={snap.customImagePosition}
+          rotation={snap.customImageRotation}
+          scale={snap.customImageScale}
           opacity={0.7}
           map={texture}
           map-anisotropy={16}
