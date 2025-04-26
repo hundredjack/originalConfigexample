@@ -42,7 +42,14 @@ const ImageUploader = () => {
     <div className="image-uploader">
       <div className="uploader-instructions">
         <p>Upload your own image or use our pre-made logos</p>
-        <p className="small-text">Use the controls panel to position, rotate, and scale your image</p>
+        <p className="small-text">
+          <strong>Direct manipulation:</strong> Use the colored handles on the image to:
+        </p>
+        <p className="small-text">
+          <span className="blue-text">• Blue handle:</span> Move the image
+          <span className="green-text"> • Green handle:</span> Resize the image
+          <span className="red-text"> • Red handle:</span> Rotate the image
+        </p>
       </div>
       <input
         ref={fileInputRef}
