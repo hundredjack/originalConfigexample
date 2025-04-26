@@ -1,3 +1,6 @@
+import { useState } from 'react'
+import { motion, AnimatePresence } from 'framer-motion'
+import { useSnapshot } from 'valtio'
 import { Logo } from '@pmndrs/branding'
 import {
   AiOutlineHighlight,
@@ -5,10 +8,9 @@ import {
   AiFillCamera,
   AiOutlineArrowLeft
 } from 'react-icons/ai'
-import { useSnapshot } from 'valtio'
 import { state } from './store'
-import { motion, AnimatePresence } from 'framer-motion'
 import ImageUploader from './ImageUploader'
+import ModelSwitcher from './ModelSwitcher'
 
 export default function Overlay() {
   const snap = useSnapshot(state)
@@ -73,12 +75,24 @@ function Intro({ config }) {
 function Customizer({ config }) {
   const snap = useSnapshot(state)
 
+  const downloadCanvasToImage = () => {
+    const canvas = document.querySelector('canvas')
+    const dataURL = canvas.toDataURL()
+    const link = document.createElement('a')
+
+    link.href = dataURL
+    link.download = 'canvas.png'
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+  }
+
   return (
     <motion.section {...config}>
       <div className="customizer">
         {/* Image uploader component moved to the top */}
         <ImageUploader />
-        
+        <ModelSwitcher />
         <div className="color-options">
           {snap.colors.map((color) => (
             <div
@@ -101,29 +115,18 @@ function Customizer({ config }) {
                   // Set default position, rotation, and scale for the selected decal
                   state.customImagePosition = [0, 0.04, 0.15];
                   state.customImageRotation = [0, 0, 0];
-                  state.customImageScale = 0.15;
+                  state.customImageScale = 0.25;
                 }}>
-                <img src={decal + '_thumb.png'} alt="brand" />
+                <img src={decal + '.png'} alt="brand" />
               </div>
             ))}
           </div>
         </div>
 
         <button
-          className="share"
+          className="download-btn"
           style={{ background: snap.selectedColor }}
-          onClick={() => {
-            const link = document.createElement('a')
-            link.setAttribute('download', 'canvas.png')
-            link.setAttribute(
-              'href',
-              document
-                .querySelector('canvas')
-                .toDataURL('image/png')
-                .replace('image/png', 'image/octet-stream')
-            )
-            link.click()
-          }}>
+          onClick={downloadCanvasToImage}>
           DOWNLOAD
           <AiFillCamera size="1.3em" />
         </button>
@@ -134,6 +137,14 @@ function Customizer({ config }) {
           onClick={() => (state.intro = true)}>
           GO BACK
           <AiOutlineArrowLeft size="1.3em" />
+        </button>
+        
+        {/* Debug button - only visible in customizer mode */}
+        <button
+          className="debug-btn"
+          style={{ background: snap.debug ? '#EF674E' : '#353934' }}
+          onClick={() => (state.debug = !state.debug)}>
+          {snap.debug ? 'DEBUG ON' : 'DEBUG OFF'}
         </button>
       </div>
     </motion.section>

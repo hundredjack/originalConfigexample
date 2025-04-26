@@ -31,7 +31,7 @@ const ImageUploader = () => {
     // Reset position, rotation, and scale to defaults
     state.customImagePosition = [0, 0.04, 0.15]
     state.customImageRotation = [0, 0, 0]
-    state.customImageScale = 0.15
+    state.customImageScale = 0.2
   }
 
   const triggerFileInput = () => {
@@ -43,12 +43,11 @@ const ImageUploader = () => {
       <div className="uploader-instructions">
         <p>Upload your own image or use our pre-made logos</p>
         <p className="small-text">
-          <strong>Direct manipulation:</strong> Use the colored handles on the image to:
+          <strong>Direct manipulation:</strong> Drag directly on the image to move it
         </p>
         <p className="small-text">
-          <span className="blue-text">• Blue handle:</span> Move the image
-          <span className="green-text"> • Green handle:</span> Resize the image
-          <span className="red-text"> • Red handle:</span> Rotate the image
+          <span className="green-text">• Green handle:</span> Move up/down to resize the image
+          <span className="red-text"> • Red handle:</span> Move up/down to rotate the image
         </p>
       </div>
       <input

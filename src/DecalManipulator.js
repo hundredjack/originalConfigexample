@@ -1,7 +1,7 @@
 import React, { useRef, useState, useEffect } from 'react'
 import { useThree, useFrame } from '@react-three/fiber'
 import { Plane, useCursor } from '@react-three/drei'
-import { Vector3 } from 'three'
+import { Vector3, Raycaster } from 'three'
 import { useSnapshot } from 'valtio'
 import { state } from './store'
 
@@ -11,7 +11,6 @@ export function DecalManipulator() {
   const { camera, raycaster, mouse, scene } = useThree()
   
   // References for the manipulation handles
-  const moveRef = useRef()
   const scaleRef = useRef()
   const rotateRef = useRef()
   
@@ -71,12 +70,12 @@ export function DecalManipulator() {
       const newScale = startValue + delta.y * sensitivity
       state.customImageScale = Math.max(0.05, Math.min(0.5, newScale))
     } else if (activeDrag === 'rotate') {
-      // Rotate the decal
+      // Rotate the decal - now using Y axis (up/down) movement
       const sensitivity = 3
       state.customImageRotation = [
         startValue[0],
         startValue[1],
-        startValue[2] + delta.x * sensitivity
+        startValue[2] + delta.y * sensitivity
       ]
     }
   }
@@ -95,20 +94,6 @@ export function DecalManipulator() {
   
   return (
     <group position={position}>
-      {/* Move handle */}
-      <mesh
-        ref={moveRef}
-        position={[0, 0, 0.01]}
-        onPointerDown={(e) => handlePointerDown(e, 'move')}
-        onPointerMove={handlePointerMove}
-        onPointerUp={handlePointerUp}
-        onPointerOver={() => setHovered('move')}
-        onPointerOut={() => setHovered(null)}
-      >
-        <sphereGeometry args={[0.03, 16, 16]} />
-        <meshBasicMaterial color="blue" transparent opacity={0.7} />
-      </mesh>
-      
       {/* Scale handle */}
       <mesh
         ref={scaleRef}
