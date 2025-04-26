@@ -9,7 +9,6 @@ import { useSnapshot } from 'valtio'
 import { state } from './store'
 import { motion, AnimatePresence } from 'framer-motion'
 import ImageUploader from './ImageUploader'
-import ImageControls from './ImageControls'
 
 export default function Overlay() {
   const snap = useSnapshot(state)
@@ -79,9 +78,6 @@ function Customizer({ config }) {
       <div className="customizer">
         {/* Image uploader component moved to the top */}
         <ImageUploader />
-        
-        {/* Image controls component (invisible but functional) */}
-        {(snap.isCustomImage || snap.selectedDecal) && <ImageControls />}
         
         <div className="color-options">
           {snap.colors.map((color) => (
