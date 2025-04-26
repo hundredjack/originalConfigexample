@@ -13,6 +13,7 @@ import {
 } from '@react-three/drei'
 import { useSnapshot } from 'valtio'
 import { state } from './store'
+import * as THREE from 'three'
 
 export const App = ({ position = [0, 0, 2.5], fov = 25 }) => (
   <Canvas
@@ -36,7 +37,15 @@ export const App = ({ position = [0, 0, 2.5], fov = 25 }) => (
 function Shirt(props) {
   const snap = useSnapshot(state)
 
-  const texture = useTexture(`/${snap.selectedDecal}.png`)
+  // Use custom image if available, otherwise use the selected decal
+  const texture = snap.useCustomImage && snap.customImage 
+    ? new THREE.Texture(snap.customImage) 
+    : useTexture(`/${snap.selectedDecal}.png`)
+  
+  // Update texture if it's a custom image
+  if (snap.useCustomImage && snap.customImage && texture instanceof THREE.Texture) {
+    texture.needsUpdate = true
+  }
 
   const { nodes, materials } = useGLTF('/shirt_baked_collapsed.glb')
 
@@ -53,12 +62,13 @@ function Shirt(props) {
       {...props}
       dispose={null}>
       <Decal
-        position={[0, 0.04, 0.15]}
-        rotation={[0, 0, 0]}
-        scale={0.15}
-        opacity={0.7}
+        position={snap.decalPosition}
+        rotation={snap.decalRotation}
+        scale={snap.useCustomImage ? snap.decalScale : 0.15}
         map={texture}
         map-anisotropy={16}
+        transparent
+        opacity={0.7}
       />
     </mesh>
   )
