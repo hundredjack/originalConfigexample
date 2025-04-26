@@ -14,6 +14,7 @@ import {
 import { useSnapshot } from 'valtio'
 import { state } from './store'
 import * as THREE from 'three'
+import { DecalManipulator } from './DecalManipulator'
 
 export const App = ({ position = [0, 0, 2.5], fov = 25 }) => (
   <Canvas
@@ -29,6 +30,7 @@ export const App = ({ position = [0, 0, 2.5], fov = 25 }) => (
       <Backdrop />
       <Center>
         <Shirt />
+        <DecalManipulator />
       </Center>
     </CameraRig>
   </Canvas>
