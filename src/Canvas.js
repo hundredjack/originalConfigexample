@@ -1,4 +1,4 @@
-import { useRef } from 'react'
+import { useRef, useState, useEffect } from 'react'
 import { Canvas, useFrame } from '@react-three/fiber'
 import { easing } from 'maath'
 
@@ -36,22 +36,30 @@ export const App = ({ position = [0, 0, 2.5], fov = 25 }) => (
 
 function Shirt(props) {
   const snap = useSnapshot(state)
-
-  // Use custom image if available, otherwise use the selected decal
-  const texture = snap.useCustomImage && snap.customImage 
-    ? new THREE.Texture(snap.customImage) 
-    : useTexture(`/${snap.selectedDecal}.png`)
+  const [texture, setTexture] = useState(null)
+  const defaultTexture = useTexture(`/${snap.selectedDecal}.png`)
   
-  // Update texture if it's a custom image
-  if (snap.useCustomImage && snap.customImage && texture instanceof THREE.Texture) {
-    texture.needsUpdate = true
-  }
+  // Create a custom texture when a custom image is uploaded
+  useEffect(() => {
+    if (snap.useCustomImage && snap.customImage) {
+      const newTexture = new THREE.Texture(snap.customImage)
+      newTexture.needsUpdate = true
+      setTexture(newTexture)
+    } else {
+      setTexture(defaultTexture)
+    }
+  }, [snap.useCustomImage, snap.customImage, defaultTexture])
 
   const { nodes, materials } = useGLTF('/shirt_baked_collapsed.glb')
 
-  useFrame((state, delta) =>
-    easing.dampC(materials.lambert1.color, snap.selectedColor, 0.25, delta)
-  )
+  useFrame((state, delta) => {
+    if (materials && materials.lambert1) {
+      easing.dampC(materials.lambert1.color, snap.selectedColor, 0.25, delta)
+    }
+  })
+
+  // Don't render the decal until texture is loaded
+  if (!texture) return null
 
   return (
     <mesh
@@ -76,15 +84,18 @@ function Shirt(props) {
 
 function Backdrop() {
   const shadows = useRef()
+  const snap = useSnapshot(state)
 
-  useFrame((state, delta) =>
-    easing.dampC(
-      shadows.current.getMesh().material.color,
-      state.selectedColor,
-      0.25,
-      delta
-    )
-  )
+  useFrame((state, delta) => {
+    if (shadows.current) {
+      easing.dampC(
+        shadows.current.getMesh().material.color,
+        snap.selectedColor,
+        0.25,
+        delta
+      )
+    }
+  })
 
   return (
     <AccumulativeShadows
@@ -115,7 +126,6 @@ function Backdrop() {
 
 function CameraRig({ children }) {
   const group = useRef()
-
   const snap = useSnapshot(state)
 
   useFrame((state, delta) => {
