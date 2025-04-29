@@ -8,6 +8,7 @@
     "@pmndrs/branding": "0.0.8",
     "@react-three/drei": "9.58.3",
     "@react-three/fiber": "8.12.0",
+    "file-saver": "^2.0.5",
     "framer-motion": "10.12.17",
     "leva": "^0.10.0",
     "maath": "0.7.0",

@@ -16,6 +16,13 @@ const ModelSwitcher = () => {
     updateModelPosition(nextModel)
   }
 
+  // Get the next model name for the button text
+  const getNextModelName = () => {
+    const currentIndex = snap.models.indexOf(snap.selectedModel)
+    const nextIndex = (currentIndex + 1) % snap.models.length
+    return snap.models[nextIndex].toUpperCase()
+  }
+
   return (
     <div className="model-switcher">
       <button
@@ -24,7 +31,7 @@ const ModelSwitcher = () => {
         onClick={handleModelSwitch}
       >
         <AiOutlineSwap size="1.3em" />
-        SWITCH TO {snap.selectedModel === 'shirt' ? 'CUBE' : 'SHIRT'}
+        SWITCH TO {getNextModelName()}
       </button>
       <p className="model-name">Current model: {snap.selectedModel.toUpperCase()}</p>
     </div>

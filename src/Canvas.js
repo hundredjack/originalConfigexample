@@ -24,7 +24,13 @@ export const App = ({ position = [0, 0, 2.5], fov = 25 }) => (
     gl={{ preserveDrawingBuffer: true }}
     camera={{ position, fov }}
     eventSource={document.getElementById('root')}
-    eventPrefix="client">
+    eventPrefix="client"
+    style={{ touchAction: 'none' }} // Prevent touch scrolling
+    onCreated={({ gl }) => {
+      // Set background to transparent to allow detecting clicks on background
+      gl.setClearColor(new THREE.Color(0, 0, 0), 0);
+    }}
+  >
     <ambientLight intensity={0.5} />
     <Environment files="https://dl.polyhaven.org/file/ph-assets/HDRIs/hdr/1k/potsdamer_platz_1k.hdr" />
 
@@ -41,24 +47,8 @@ export const App = ({ position = [0, 0, 2.5], fov = 25 }) => (
 // This component decides which model to render based on the selected model in state
 function ConfigurableModel() {
   const snap = useSnapshot(state)
-  
-  return (
-    <>
-      {snap.selectedModel === 'shirt' && <Shirt />}
-      {snap.selectedModel === 'cube' && <Cube />}
-    </>
-  )
-}
-
-function Shirt(props) {
-  const snap = useSnapshot(state)
   const { camera, mouse } = useThree()
   
-  // State for dragging
-  const [isDragging, setIsDragging] = useState(false)
-  const [startPosition, setStartPosition] = useState([0, 0])
-  const [startImagePosition, setStartImagePosition] = useState([0, 0, 0])
-
   // Load the selected decal texture
   const texture = useTexture(`/${snap.selectedDecal}.png`)
   
@@ -80,32 +70,108 @@ function Shirt(props) {
   if (!snap.isCustomImage && customTextureRef.current) {
     customTextureRef.current = null
   }
+  
+  // Render the selected model with decals
+  return (
+    <group rotation={snap.modelRotation}>
+      {/* Shirt Model */}
+      {snap.selectedModel === 'shirt' && <Shirt texture={texture} customTextureRef={customTextureRef} />}
+      
+      {/* Cube Model */}
+      {snap.selectedModel === 'cube' && <Cube texture={texture} customTextureRef={customTextureRef} />}
+    </group>
+  )
+}
+
+function Shirt({ texture, customTextureRef, ...props }) {
+  const snap = useSnapshot(state)
+  const { camera, mouse, raycaster, scene, gl } = useThree()
+  
+  // Refs for the mesh and decals
+  const meshRef = useRef()
+  
+  // State for dragging
+  const [isDragging, setIsDragging] = useState(false)
+  const [startPosition, setStartPosition] = useState([0, 0])
+  const [startImagePosition, setStartImagePosition] = useState([0, 0, 0])
+  
+  // State for model rotation
+  const [isRotating, setIsRotating] = useState(false)
+  const [startRotation, setStartRotation] = useState([0, 0])
+  const [startModelRotation, setStartModelRotation] = useState([0, 0, 0])
+  
+  // State to track if we just finished dragging (to prevent onClick firing)
+  const [justFinishedDragging, setJustFinishedDragging] = useState(false)
 
   const { nodes, materials } = useGLTF('/shirt_baked_collapsed.glb')
 
-  useFrame((state, delta) =>
+  useFrame((state, delta) => {
     easing.dampC(materials.lambert1.color, snap.selectedColor, 0.25, delta)
-  )
-  
-  // Create a material for the decal with improved settings for better surface following
-  const decalMaterial = new THREE.MeshPhongMaterial({
-    transparent: true,
-    opacity: 0.95,
-    depthWrite: false,
-    polygonOffset: true,
-    polygonOffsetFactor: -10,
-    side: THREE.DoubleSide,
-    map: snap.isCustomImage ? customTextureRef.current : texture,
-    shininess: 0, // Reduce shininess to improve visibility
-    flatShading: false, // Ensure smooth shading
-    bumpScale: 0.01, // Add slight bump mapping for better surface adherence
-    dithering: true // Enable dithering for smoother appearance
+    
+    // Reset the justFinishedDragging flag after a short delay
+    if (justFinishedDragging) {
+      setTimeout(() => {
+        setJustFinishedDragging(false)
+      }, 100)
+    }
   })
   
-  // Handle pointer down on decal - only if not in intro mode
+  // Handle model click for decal placement
+  const handleModelClick = (e) => {
+    // Only handle clicks when decal movement is enabled
+    // Also prevent click handling right after dragging ends
+    if (!snap.isDecalMovementEnabled || justFinishedDragging) return
+    
+    // If we already have a decal, don't allow repositioning by clicking
+    if ((snap.isCustomImage && customTextureRef.current) || (!snap.isCustomImage && snap.selectedDecal)) {
+      return;
+    }
+    
+    // Stop event propagation
+    e.stopPropagation()
+    
+    // Get the intersection point in world space
+    const intersectionPoint = e.point.clone()
+    
+    // Get the face normal at the intersection point
+    const faceNormal = e.face.normal.clone()
+    
+    // Apply model transformations to the normal
+    const normalMatrix = new THREE.Matrix3().getNormalMatrix(
+      meshRef.current.matrixWorld
+    )
+    faceNormal.applyMatrix3(normalMatrix).normalize()
+    
+    // Create a matrix to convert from world space to model local space
+    // This accounts for the model's rotation
+    const worldToLocal = new THREE.Matrix4().copy(meshRef.current.matrixWorld).invert()
+    
+    // Convert the intersection point from world space to model local space
+    const localIntersectionPoint = intersectionPoint.clone().applyMatrix4(worldToLocal)
+    
+    // Update position in the global state using local coordinates
+    state.customImagePosition = localIntersectionPoint.toArray()
+    
+    // Calculate rotation to align with the surface normal
+    const rotationFromNormal = new THREE.Euler().setFromQuaternion(
+      new THREE.Quaternion().setFromUnitVectors(
+        new THREE.Vector3(0, 0, 1),
+        faceNormal
+      )
+    )
+    
+    // Update rotation in global state
+    state.customImageRotation = [
+      rotationFromNormal.x,
+      rotationFromNormal.y,
+      rotationFromNormal.z
+    ]
+  }
+  
+  // Handle pointer down on decal - only if decal movement is enabled
   const handlePointerDown = (e) => {
-    // Don't allow dragging in intro mode
-    if (snap.intro) return
+    // Don't allow dragging if decal movement is disabled
+    if (!snap.isDecalMovementEnabled) return
     
     e.stopPropagation()
     setIsDragging(true)
@@ -114,17 +180,18 @@ function Shirt(props) {
     e.target.setPointerCapture(e.pointerId)
   }
   
-  // Handle pointer move while dragging - only if not in intro mode
+  // Handle pointer move while dragging - only if decal movement is enabled
   const handlePointerMove = (e) => {
-    // Don't allow dragging in intro mode
-    if (snap.intro) return
+    // Don't allow dragging if decal movement is disabled
+    if (!snap.isDecalMovementEnabled) return
     
     if (!isDragging) return
     
+    // Calculate delta movement
     const deltaX = mouse.x - startPosition[0]
     const deltaY = mouse.y - startPosition[1]
     
-    // Update the image position
+    // Update position based on delta movement along the surface
     state.customImagePosition = [
       startImagePosition[0] + deltaX * 0.5,
       startImagePosition[1] + deltaY * 0.5,
@@ -136,14 +203,50 @@ function Shirt(props) {
   const handlePointerUp = (e) => {
     if (isDragging) {
       setIsDragging(false)
+      setJustFinishedDragging(true) // Set flag to prevent onClick from firing
       e.target.releasePointerCapture(e.pointerId)
     }
+    
+    if (isRotating) {
+      setIsRotating(false)
+      e.target.releasePointerCapture(e.pointerId)
+    }
+  }
+  
+  // Handle model rotation on pointer down
+  const handleModelPointerDown = (e) => {
+    // Don't allow rotation if decal movement is enabled
+    if (snap.isDecalMovementEnabled) return
+    
+    e.stopPropagation()
+    setIsRotating(true)
+    setStartRotation([mouse.x, mouse.y])
+    setStartModelRotation([...snap.modelRotation])
+    e.target.setPointerCapture(e.pointerId)
+  }
+  
+  // Handle model rotation on pointer move
+  const handleModelPointerMove = (e) => {
+    // Don't allow rotation if decal movement is enabled
+    if (snap.isDecalMovementEnabled) return
+    
+    if (!isRotating) return
+    
+    const deltaX = mouse.x - startRotation[0]
+    const deltaY = mouse.y - startRotation[1]
+    
+    // Update the model rotation (y-axis for horizontal movement, x-axis for vertical)
+    state.modelRotation = [
+      startModelRotation[0] - deltaY * 2, // Inverted vertical rotation
+      startModelRotation[1] + deltaX * 2,
+      startModelRotation[2]
+    ]
   }
 
   // Create a draggable plane that will be positioned over the decal
   const DecalDragPlane = ({ position, rotation, scale }) => {
-    // Don't render the drag plane in intro mode
-    if (snap.intro) return null
+    // Don't render the drag plane if decal movement is disabled
+    if (!snap.isDecalMovementEnabled) return null
     
     return (
       <mesh
@@ -165,37 +268,17 @@ function Shirt(props) {
     );
   };
 
-  // Enhanced decal configuration for better surface following
-  const decalConfig = {
-    // Common properties for both built-in and custom decals
-    position: snap.customImagePosition,
-    rotation: snap.customImageRotation,
-    scale: snap.customImageScale,
-    material: decalMaterial,
-    'map-anisotropy': 16,
-    polygonOffset: true,
-    polygonOffsetFactor: -10,
-    renderOrder: 1,
-    depthTest: true, // Enable depth test for better surface following
-    depthWrite: false,
-    sizeAttenuation: false,
-    transparent: true,
-    flatShading: false,
-    debug: snap.debug,
-    segments: 64, // Increase segments for better surface conformity
-    zIndex: 100, // Ensure decal is rendered on top
-    attach: snap.debug ? undefined : 'material', // Only attach in non-debug mode
-    'material-toneMapped': false, // Disable tone mapping for more accurate colors
-    'material-emissive': new THREE.Color(0x000000), // Add slight emissive for better visibility
-    'material-emissiveIntensity': 0.1
-  };
-
   return (
     <mesh
+      ref={meshRef}
       castShadow
       geometry={nodes.T_Shirt_male.geometry}
       material={materials.lambert1}
       material-roughness={1}
+      onClick={handleModelClick}
+      onPointerDown={handleModelPointerDown}
+      onPointerMove={handleModelPointerMove}
+      onPointerUp={handlePointerUp}
       {...props}
       dispose={null}>
       
@@ -203,8 +286,20 @@ function Shirt(props) {
       {!snap.isCustomImage && snap.selectedDecal && (
         <>
           <Decal
+            position={snap.customImagePosition}
+            rotation={snap.customImageRotation}
+            scale={snap.customImageScale}
             map={texture}
-            {...decalConfig}
+            map-anisotropy={16}
+            polygonOffset={true}
+            polygonOffsetFactor={-10}
+            renderOrder={1}
+            depthTest={true}
+            depthWrite={false}
+            transparent={true}
+            flatShading={false}
+            debug={snap.debug}
+            segments={64}
           />
           <DecalDragPlane 
             position={snap.customImagePosition}
@@ -218,8 +313,20 @@ function Shirt(props) {
       {snap.isCustomImage && customTextureRef.current && (
         <>
           <Decal
+            position={snap.customImagePosition}
+            rotation={snap.customImageRotation}
+            scale={snap.customImageScale}
             map={customTextureRef.current}
-            {...decalConfig}
+            map-anisotropy={16}
+            polygonOffset={true}
+            polygonOffsetFactor={-10}
+            renderOrder={1}
+            depthTest={true}
+            depthWrite={false}
+            transparent={true}
+            flatShading={false}
+            debug={snap.debug}
+            segments={64}
           />
           <DecalDragPlane 
             position={snap.customImagePosition}
@@ -232,67 +339,104 @@ function Shirt(props) {
   )
 }
 
-// Cube model component
-function Cube(props) {
+function Cube({ texture, customTextureRef, ...props }) {
   const snap = useSnapshot(state)
-  const { camera, mouse } = useThree()
+  const { camera, mouse, raycaster, scene, gl } = useThree()
+  
+  // Refs for the mesh and decals
+  const meshRef = useRef()
   
   // State for dragging
   const [isDragging, setIsDragging] = useState(false)
   const [startPosition, setStartPosition] = useState([0, 0])
   const [startImagePosition, setStartImagePosition] = useState([0, 0, 0])
   
+  // State for model rotation
+  const [isRotating, setIsRotating] = useState(false)
+  const [startRotation, setStartRotation] = useState([0, 0])
+  const [startModelRotation, setStartModelRotation] = useState([0, 0, 0])
+  
+  // State to track if we just finished dragging (to prevent onClick firing)
+  const [justFinishedDragging, setJustFinishedDragging] = useState(false)
+  
   // Material for the cube
   const cubeMaterial = useRef()
-  
-  // Load the selected decal texture
-  const texture = useTexture(`/${snap.selectedDecal}.png`)
-  
-  // Create a ref for the custom image texture
-  const customTextureRef = useRef(null)
-  
-  // Create a custom texture from the uploaded image if available
-  if (snap.isCustomImage && snap.customImage && !customTextureRef.current) {
-    const img = new Image()
-    img.src = snap.customImage
-    const customTexture = new THREE.Texture(img)
-    img.onload = () => {
-      customTexture.needsUpdate = true
-    }
-    customTextureRef.current = customTexture
-  }
-  
-  // Reset the custom texture when the custom image is removed
-  if (!snap.isCustomImage && customTextureRef.current) {
-    customTextureRef.current = null
-  }
   
   // Update cube color
   useFrame((state, delta) => {
     if (cubeMaterial.current) {
-      easing.dampC(cubeMaterial.current.color, snap.selectedColor, 0.25, delta)
+      easing.dampC(
+        cubeMaterial.current.color,
+        snap.selectedColor,
+        0.25,
+        delta
+      )
+    }
+    
+    // Reset the justFinishedDragging flag after a short delay
+    if (justFinishedDragging) {
+      setTimeout(() => {
+        setJustFinishedDragging(false)
+      }, 100)
     }
   })
   
-  // Create a material for the decal with improved settings for better surface following
-  const decalMaterial = new THREE.MeshPhongMaterial({
-    transparent: true,
-    opacity: 0.95,
-    depthWrite: false,
-    polygonOffset: true,
-    polygonOffsetFactor: -10,
-    side: THREE.DoubleSide,
-    map: snap.isCustomImage ? customTextureRef.current : texture,
-    shininess: 0, // Reduce shininess to improve visibility
-    flatShading: false, // Ensure smooth shading
-    bumpScale: 0.01, // Add slight bump mapping for better surface adherence
-    dithering: true // Enable dithering for smoother appearance
-  })
+  // Handle model click for decal placement
+  const handleModelClick = (e) => {
+    // Only handle clicks when decal movement is enabled
+    // Also prevent click handling right after dragging ends
+    if (!snap.isDecalMovementEnabled || justFinishedDragging) return
+    
+    // If we already have a decal, don't allow repositioning by clicking
+    if ((snap.isCustomImage && customTextureRef.current) || (!snap.isCustomImage && snap.selectedDecal)) {
+      return;
+    }
+    
+    // Stop event propagation
+    e.stopPropagation()
+    
+    // Get the intersection point in world space
+    const intersectionPoint = e.point.clone()
+    
+    // Get the face normal at the intersection point
+    const faceNormal = e.face.normal.clone()
+    
+    // Apply model transformations to the normal
+    const normalMatrix = new THREE.Matrix3().getNormalMatrix(
+      meshRef.current.matrixWorld
+    )
+    faceNormal.applyMatrix3(normalMatrix).normalize()
+    
+    // Create a matrix to convert from world space to model local space
+    // This accounts for the model's rotation
+    const worldToLocal = new THREE.Matrix4().copy(meshRef.current.matrixWorld).invert()
+    
+    // Convert the intersection point from world space to model local space
+    const localIntersectionPoint = intersectionPoint.clone().applyMatrix4(worldToLocal)
+    
+    // Update position in the global state using local coordinates
+    state.customImagePosition = localIntersectionPoint.toArray()
+    
+    // Calculate rotation to align with the surface normal
+    const rotationFromNormal = new THREE.Euler().setFromQuaternion(
+      new THREE.Quaternion().setFromUnitVectors(
+        new THREE.Vector3(0, 0, 1),
+        faceNormal
+      )
+    )
+    
+    // Update rotation in global state
+    state.customImageRotation = [
+      rotationFromNormal.x,
+      rotationFromNormal.y,
+      rotationFromNormal.z
+    ]
+  }
   
-  // Handle pointer down on decal - only if not in intro mode
+  // Handle pointer down on decal - only if decal movement is enabled
   const handlePointerDown = (e) => {
-    // Don't allow dragging in intro mode
-    if (snap.intro) return
+    // Don't allow dragging if decal movement is disabled
+    if (!snap.isDecalMovementEnabled) return
     
     e.stopPropagation()
     setIsDragging(true)
@@ -301,17 +445,18 @@ function Cube(props) {
     e.target.setPointerCapture(e.pointerId)
   }
   
-  // Handle pointer move while dragging - only if not in intro mode
+  // Handle pointer move while dragging - only if decal movement is enabled
   const handlePointerMove = (e) => {
-    // Don't allow dragging in intro mode
-    if (snap.intro) return
+    // Don't allow dragging if decal movement is disabled
+    if (!snap.isDecalMovementEnabled) return
     
     if (!isDragging) return
     
+    // Calculate delta movement
     const deltaX = mouse.x - startPosition[0]
     const deltaY = mouse.y - startPosition[1]
     
-    // Update the image position
+    // Update position based on delta movement along the surface
     state.customImagePosition = [
       startImagePosition[0] + deltaX * 0.5,
       startImagePosition[1] + deltaY * 0.5,
@@ -323,14 +468,50 @@ function Cube(props) {
   const handlePointerUp = (e) => {
     if (isDragging) {
       setIsDragging(false)
+      setJustFinishedDragging(true) // Set flag to prevent onClick from firing
+      e.target.releasePointerCapture(e.pointerId)
+    }
+    
+    if (isRotating) {
+      setIsRotating(false)
       e.target.releasePointerCapture(e.pointerId)
     }
   }
   
+  // Handle model rotation on pointer down
+  const handleModelPointerDown = (e) => {
+    // Don't allow rotation if decal movement is enabled
+    if (snap.isDecalMovementEnabled) return
+    
+    e.stopPropagation()
+    setIsRotating(true)
+    setStartRotation([mouse.x, mouse.y])
+    setStartModelRotation([...snap.modelRotation])
+    e.target.setPointerCapture(e.pointerId)
+  }
+  
+  // Handle model rotation on pointer move
+  const handleModelPointerMove = (e) => {
+    // Don't allow rotation if decal movement is enabled
+    if (snap.isDecalMovementEnabled) return
+    
+    if (!isRotating) return
+    
+    const deltaX = mouse.x - startRotation[0]
+    const deltaY = mouse.y - startRotation[1]
+    
+    // Update the model rotation (y-axis for horizontal movement, x-axis for vertical)
+    state.modelRotation = [
+      startModelRotation[0] - deltaY * 2, // Inverted vertical rotation
+      startModelRotation[1] + deltaX * 2,
+      startModelRotation[2]
+    ]
+  }
+
   // Create a draggable plane that will be positioned over the decal
   const DecalDragPlane = ({ position, rotation, scale }) => {
-    // Don't render the drag plane in intro mode
-    if (snap.intro) return null
+    // Don't render the drag plane if decal movement is disabled
+    if (!snap.isDecalMovementEnabled) return null
     
     return (
       <mesh
@@ -352,37 +533,14 @@ function Cube(props) {
     );
   };
 
-  // Enhanced decal configuration for better surface following
-  const decalConfig = {
-    // Common properties for both built-in and custom decals
-    position: snap.customImagePosition,
-    rotation: snap.customImageRotation,
-    scale: snap.customImageScale,
-    material: decalMaterial,
-    'map-anisotropy': 16,
-    polygonOffset: true,
-    polygonOffsetFactor: -10,
-    renderOrder: 1,
-    depthTest: true,
-    depthWrite: false,
-    sizeAttenuation: false,
-    transparent: true,
-    flatShading: false,
-    debug: snap.debug,
-    segments: 64,
-    zIndex: 100,
-    attach: snap.debug ? undefined : 'material',
-    'material-toneMapped': false,
-    'material-emissive': new THREE.Color(0x000000),
-    'material-emissiveIntensity': 0.1
-  };
-  
   return (
     <Box
+      ref={meshRef}
       args={[0.45, 0.55, 0.15]} 
-      castShadow
-      receiveShadow
-      position={[0, 0, 0]} 
+      onClick={handleModelClick}
+      onPointerDown={handleModelPointerDown}
+      onPointerMove={handleModelPointerMove}
+      onPointerUp={handlePointerUp}
       {...props}
     >
       <meshStandardMaterial
@@ -396,8 +554,20 @@ function Cube(props) {
       {!snap.isCustomImage && snap.selectedDecal && (
         <>
           <Decal
+            position={snap.customImagePosition}
+            rotation={snap.customImageRotation}
+            scale={snap.customImageScale}
             map={texture}
-            {...decalConfig}
+            map-anisotropy={16}
+            polygonOffset={true}
+            polygonOffsetFactor={-10}
+            renderOrder={1}
+            depthTest={true}
+            depthWrite={false}
+            transparent={true}
+            flatShading={false}
+            debug={snap.debug}
+            segments={64}
           />
           <DecalDragPlane 
             position={snap.customImagePosition}
@@ -411,8 +581,20 @@ function Cube(props) {
       {snap.isCustomImage && customTextureRef.current && (
         <>
           <Decal
+            position={snap.customImagePosition}
+            rotation={snap.customImageRotation}
+            scale={snap.customImageScale}
             map={customTextureRef.current}
-            {...decalConfig}
+            map-anisotropy={16}
+            polygonOffset={true}
+            polygonOffsetFactor={-10}
+            renderOrder={1}
+            depthTest={true}
+            depthWrite={false}
+            transparent={true}
+            flatShading={false}
+            debug={snap.debug}
+            segments={64}
           />
           <DecalDragPlane 
             position={snap.customImagePosition}
@@ -467,24 +649,94 @@ function Backdrop() {
 
 function CameraRig({ children }) {
   const group = useRef()
-
   const snap = useSnapshot(state)
-
+  
+  // State for manual rotation
+  const [isDragging, setIsDragging] = useState(false)
+  const [startPosition, setStartPosition] = useState({ x: 0, y: 0 })
+  const [rotation, setRotation] = useState({ x: 0, y: 0 })
+  
+  // Limits for rotation (in radians)
+  const rotationLimits = {
+    x: { min: -Math.PI / 6, max: Math.PI / 6 }, // pitch (up/down)
+    y: { min: -Math.PI / 4, max: Math.PI / 4 }  // yaw (left/right)
+  }
+  
+  // Handle pointer down on background
+  const handlePointerDown = (e) => {
+    // Only trigger on background (not on models or UI)
+    if (e.object && (e.object.type === 'Mesh' || e.object.type === 'Group')) {
+      return
+    }
+    
+    setIsDragging(true)
+    setStartPosition({ x: e.clientX, y: e.clientY })
+  }
+  
+  // Handle pointer move for rotation
+  const handlePointerMove = (e) => {
+    if (!isDragging) return
+    
+    // Calculate rotation delta
+    const deltaX = (e.clientX - startPosition.x) * 0.005
+    const deltaY = (e.clientY - startPosition.y) * 0.005
+    
+    // Update rotation with limits
+    setRotation({
+      x: Math.max(
+        rotationLimits.x.min,
+        Math.min(rotationLimits.x.max, rotation.x - deltaY)
+      ),
+      y: Math.max(
+        rotationLimits.y.min,
+        Math.min(rotationLimits.y.max, rotation.y - deltaX)
+      )
+    })
+    
+    // Update start position for next move
+    setStartPosition({ x: e.clientX, y: e.clientY })
+  }
+  
+  // Handle pointer up to end dragging
+  const handlePointerUp = () => {
+    setIsDragging(false)
+  }
+  
+  // Apply automatic and manual rotation
   useFrame((state, delta) => {
+    // Automatic camera position
     easing.damp3(
       state.camera.position,
-      [snap.intro ? -state.viewport.width / 4 : 0, 0, 2],
+      [0, 0, 2],
       0.25,
       delta
     )
+    
+    // Apply both automatic mouse following and manual drag rotation
+    // Reduced sensitivity for mouse movement by dividing by larger values
     easing.dampE(
       group.current.rotation,
-      [state.pointer.y / 5, -state.pointer.x / 2.5, 0],
+      [
+        state.pointer.y / 15 + rotation.x, 
+        -state.pointer.x / 15 + rotation.y, 
+        0 // roll (z-axis rotation) - kept at 0
+      ],
       0.25,
       delta
     )
   })
-  return <group ref={group}>{children}</group>
+  
+  return (
+    <group 
+      ref={group}
+      onPointerDown={handlePointerDown}
+      onPointerMove={handlePointerMove}
+      onPointerUp={handlePointerUp}
+      onPointerLeave={handlePointerUp}
+    >
+      {children}
+    </group>
+  )
 }
 
 useGLTF.preload('/shirt_baked_collapsed.glb')

@@ -1,7 +1,7 @@
 import { proxy } from 'valtio'
 
 const state = proxy({
-  intro: true,
+  intro: false, // Set intro to false by default to skip the intro screen
   colors: [
     '#ccc',
     '#EFBD4E',
@@ -27,7 +27,11 @@ const state = proxy({
   selectedModel: 'shirt',
   // Model-specific positions to ensure decals are properly positioned on each model
   shirtPosition: [0, 0.04, 0.15],
-  cubePosition: [0, 0, 0.1]
+  cubePosition: [0, 0, 0.1],
+  // Model rotation state
+  modelRotation: [0, 0, 0],
+  // Decal movement toggle - off by default
+  isDecalMovementEnabled: false
 })
 
 // Helper function to update positions when switching models
