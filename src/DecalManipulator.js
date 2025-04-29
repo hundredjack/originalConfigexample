@@ -1,125 +1,111 @@
 import React, { useRef, useState, useEffect } from 'react'
 import { useThree, useFrame } from '@react-three/fiber'
-import { Plane, useCursor } from '@react-three/drei'
-import { Vector3, Raycaster } from 'three'
 import { useSnapshot } from 'valtio'
 import { state } from './store'
+import * as THREE from 'three'
 
-// This component adds interactive handles to manipulate the decal
 export function DecalManipulator() {
   const snap = useSnapshot(state)
-  const { camera, raycaster, mouse, scene } = useThree()
+  const { scene, camera } = useThree()
   
-  // References for the manipulation handles
+  // Refs for the manipulator components
+  const groupRef = useRef()
   const scaleRef = useRef()
-  const rotateRef = useRef()
   
-  // State for tracking which handle is being dragged
-  const [activeDrag, setActiveDrag] = useState(null)
-  const [hovered, setHovered] = useState(null)
+  // State for tracking interactions
+  const [isDragging, setIsDragging] = useState(false)
+  const [isScaling, setIsScaling] = useState(false)
+  const [startPosition, setStartPosition] = useState({ x: 0, y: 0 })
+  const [startScale, setStartScale] = useState(0)
   
-  // Change cursor on hover
-  useCursor(hovered !== null)
+  // Only show manipulator when decal movement is enabled
+  const visible = snap.isDecalMovementEnabled
   
-  // Initial position for drag operation
-  const [startPosition, setStartPosition] = useState(new Vector3())
-  const [startValue, setStartValue] = useState(null)
-  
-  // Only show manipulator when not in intro mode
-  if (snap.intro) return null
-  
-  // Handle start of drag operation
-  const handlePointerDown = (e, type) => {
-    e.stopPropagation()
-    setActiveDrag(type)
-    
-    // Store initial position and values
-    setStartPosition(new Vector3(mouse.x, mouse.y, 0))
-    
-    if (type === 'move') {
-      setStartValue([...snap.customImagePosition])
-    } else if (type === 'scale') {
-      setStartValue(snap.customImageScale)
-    } else if (type === 'rotate') {
-      setStartValue([...snap.customImageRotation])
+  // Update manipulator position and rotation to match the decal
+  useFrame(() => {
+    if (groupRef.current && visible) {
+      // Position the manipulator at the decal position
+      groupRef.current.position.set(
+        snap.customImagePosition[0],
+        snap.customImagePosition[1],
+        snap.customImagePosition[2]
+      )
+      
+      // Match the decal rotation
+      groupRef.current.rotation.set(
+        snap.customImageRotation[0],
+        snap.customImageRotation[1],
+        snap.customImageRotation[2]
+      )
+      
+      // Scale the manipulator to match the decal scale
+      const scale = snap.customImageScale * 1.2 // Slightly larger than the decal
+      groupRef.current.scale.set(scale, scale, scale)
     }
+  })
+  
+  // Handle pointer down on scale handle
+  const handleScaleStart = (e) => {
+    if (!visible) return
     
-    // Capture pointer to track movement even outside the element
+    e.stopPropagation()
+    setIsScaling(true)
+    setStartPosition({ x: e.clientX, y: e.clientY })
+    setStartScale(snap.customImageScale)
     e.target.setPointerCapture(e.pointerId)
   }
   
-  // Handle drag operation
-  const handlePointerMove = (e) => {
-    if (!activeDrag) return
+  // Handle pointer move for scaling
+  const handleScaleMove = (e) => {
+    if (!isScaling) return
     
-    // Calculate movement delta
-    const currentPosition = new Vector3(mouse.x, mouse.y, 0)
-    const delta = currentPosition.clone().sub(startPosition)
+    // Calculate the distance moved
+    const deltaY = (e.clientY - startPosition.y) * -0.01
     
-    if (activeDrag === 'move') {
-      // Move the decal
-      const sensitivity = 0.5
-      state.customImagePosition = [
-        startValue[0] + delta.x * sensitivity,
-        startValue[1] + delta.y * sensitivity,
-        startValue[2]
-      ]
-    } else if (activeDrag === 'scale') {
-      // Scale the decal
-      const sensitivity = 0.3
-      const newScale = startValue + delta.y * sensitivity
-      state.customImageScale = Math.max(0.05, Math.min(0.5, newScale))
-    } else if (activeDrag === 'rotate') {
-      // Rotate the decal - now using Y axis (up/down) movement
-      const sensitivity = 3
-      state.customImageRotation = [
-        startValue[0],
-        startValue[1],
-        startValue[2] + delta.y * sensitivity
-      ]
-    }
+    // Update the scale (with limits)
+    const newScale = Math.max(0.05, Math.min(0.5, startScale + deltaY))
+    state.customImageScale = newScale
   }
   
-  // Handle end of drag operation
-  const handlePointerUp = (e) => {
-    if (activeDrag) {
+  // Handle pointer up to end scaling
+  const handleScaleEnd = (e) => {
+    if (isScaling) {
+      setIsScaling(false)
       e.target.releasePointerCapture(e.pointerId)
-      setActiveDrag(null)
     }
   }
-  
-  // Position the handles relative to the decal
-  const position = new Vector3(...snap.customImagePosition)
-  const scale = snap.customImageScale
   
   return (
-    <group position={position}>
-      {/* Scale handle */}
-      <mesh
-        ref={scaleRef}
-        position={[0, scale * 0.7, 0.01]}
-        onPointerDown={(e) => handlePointerDown(e, 'scale')}
-        onPointerMove={handlePointerMove}
-        onPointerUp={handlePointerUp}
-        onPointerOver={() => setHovered('scale')}
-        onPointerOut={() => setHovered(null)}
-      >
-        <boxGeometry args={[0.03, 0.03, 0.03]} />
-        <meshBasicMaterial color="green" transparent opacity={0.7} />
+    <group ref={groupRef} visible={visible}>
+      {/* Border outline */}
+      <mesh>
+        <planeGeometry args={[1, 1]} />
+        <meshBasicMaterial 
+          color="white" 
+          transparent={true} 
+          opacity={0.5} 
+          side={THREE.DoubleSide}
+          wireframe={true}
+          depthTest={false}
+        />
       </mesh>
       
-      {/* Rotate handle */}
-      <mesh
-        ref={rotateRef}
-        position={[scale * 0.7, 0, 0.01]}
-        onPointerDown={(e) => handlePointerDown(e, 'rotate')}
-        onPointerMove={handlePointerMove}
-        onPointerUp={handlePointerUp}
-        onPointerOver={() => setHovered('rotate')}
-        onPointerOut={() => setHovered(null)}
+      {/* Scale handle */}
+      <mesh 
+        ref={scaleRef}
+        position={[0.5, -0.5, 0]} 
+        onPointerDown={handleScaleStart}
+        onPointerMove={handleScaleMove}
+        onPointerUp={handleScaleEnd}
+        onPointerLeave={handleScaleEnd}
       >
-        <boxGeometry args={[0.03, 0.03, 0.03]} />
-        <meshBasicMaterial color="red" transparent opacity={0.7} />
+        <boxGeometry args={[0.1, 0.1, 0.01]} />
+        <meshBasicMaterial 
+          color="white" 
+          transparent={true}
+          opacity={0.8}
+          depthTest={false}
+        />
       </mesh>
     </group>
   )

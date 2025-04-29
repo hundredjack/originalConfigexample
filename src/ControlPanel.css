@@ -81,6 +81,16 @@
   box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
 }
 
+.control-btn.active {
+  box-shadow: 0 0 0 2px white;
+}
+
+.model-btn {
+  flex: 1;
+  min-width: 80px;
+  max-width: 120px;
+}
+
 .color-grid {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
@@ -99,6 +109,42 @@
 
 .color-circle:hover {
   transform: scale(1.15);
+}
+
+/* Position selector styling */
+.position-selector {
+  margin-top: 12px;
+}
+
+.position-selector h4 {
+  margin-bottom: 8px;
+}
+
+.position-buttons {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.position-btn {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 6px 10px;
+  border: none;
+  border-radius: 4px;
+  color: white;
+  font-size: 0.8rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.position-btn:hover {
+  transform: translateY(-2px);
+}
+
+.position-btn.active {
+  box-shadow: 0 0 0 2px white;
 }
 
 .decals-grid {
@@ -140,6 +186,10 @@
   .control-section {
     width: 100%;
     max-width: 100%;
+  }
+  
+  .model-btn {
+    max-width: none;
   }
 }
 

@@ -14,6 +14,7 @@ import {
   Box
 } from '@react-three/drei'
 import { useSnapshot } from 'valtio'
+
 import { state } from './store'
 import * as THREE from 'three'
 import { DecalManipulator } from './DecalManipulator'
@@ -77,8 +78,33 @@ function ConfigurableModel() {
       {/* Shirt Model */}
       {snap.selectedModel === 'shirt' && <Shirt texture={texture} customTextureRef={customTextureRef} />}
       
-      {/* Cube Model */}
-      {snap.selectedModel === 'cube' && <Cube texture={texture} customTextureRef={customTextureRef} />}
+      {/* Cube Models */}
+      {snap.selectedModel === 'cube1' && (
+        <Cube 
+          texture={texture} 
+          customTextureRef={customTextureRef} 
+          cubeType="cube1"
+          size={snap.cubeTypes.cube1.size}
+        />
+      )}
+      
+      {snap.selectedModel === 'cube2' && (
+        <Cube 
+          texture={texture} 
+          customTextureRef={customTextureRef} 
+          cubeType="cube2"
+          size={snap.cubeTypes.cube2.size}
+        />
+      )}
+      
+      {snap.selectedModel === 'cube3' && (
+        <Cube 
+          texture={texture} 
+          customTextureRef={customTextureRef} 
+          cubeType="cube3"
+          size={snap.cubeTypes.cube3.size}
+        />
+      )}
     </group>
   )
 }
@@ -124,6 +150,25 @@ function Shirt({ texture, customTextureRef, ...props }) {
     
     // If we already have a decal, don't allow repositioning by clicking
     if ((snap.isCustomImage && customTextureRef.current) || (!snap.isCustomImage && snap.selectedDecal)) {
+      return;
+    }
+    
+    // For shirt model, use the predefined positions instead of click position
+    if (snap.selectedModel === 'shirt') {
+      // Use the currently selected position from state
+      const position = snap.selectedDecalPosition;
+      if (snap.shirtDecalPositions[position]) {
+        state.customImagePosition = [...snap.shirtDecalPositions[position]];
+        
+        // Set appropriate rotation based on position
+        if (position === 'front') {
+          state.customImageRotation = [0, 0, 0];
+        } else if (position === 'leftShoulder') {
+          state.customImageRotation = [-0.5, -0.3, 0];
+        } else if (position === 'rightShoulder') {
+          state.customImageRotation = [-0.5, 0.3, 0];
+        }
+      }
       return;
     }
     
@@ -339,12 +384,15 @@ function Shirt({ texture, customTextureRef, ...props }) {
   )
 }
 
-function Cube({ texture, customTextureRef, ...props }) {
+function Cube({ texture, customTextureRef, cubeType, size = [0.3, 0.3, 0.3], ...props }) {
   const snap = useSnapshot(state)
   const { camera, mouse, raycaster, scene, gl } = useThree()
   
   // Refs for the mesh and decals
   const meshRef = useRef()
+  
+  // Material for the cube
+  const cubeMaterial = useRef()
   
   // State for dragging
   const [isDragging, setIsDragging] = useState(false)
@@ -358,9 +406,6 @@ function Cube({ texture, customTextureRef, ...props }) {
   
   // State to track if we just finished dragging (to prevent onClick firing)
   const [justFinishedDragging, setJustFinishedDragging] = useState(false)
-  
-  // Material for the cube
-  const cubeMaterial = useRef()
   
   // Update cube color
   useFrame((state, delta) => {
@@ -536,7 +581,7 @@ function Cube({ texture, customTextureRef, ...props }) {
   return (
     <Box
       ref={meshRef}
-      args={[0.45, 0.55, 0.15]} 
+      args={size} 
       onClick={handleModelClick}
       onPointerDown={handleModelPointerDown}
       onPointerMove={handleModelPointerMove}
