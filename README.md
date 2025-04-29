@@ -6,7 +6,8 @@ A powerful 3D model customization tool built with React, Three.js, and related l
 
 - **Interactive 3D Models**: Choose between a shirt or cube model
 - **360° Model Rotation**: Rotate models to view and customize from any angle
-- **Decal Placement**: Place decals anywhere on the model surface
+- **Multi-Position Decal Support**: Place different decals at multiple positions on the shirt (front, left shoulder, right shoulder)
+- **Independent Decal Control**: Toggle visibility and customize each decal separately
 - **Decal Dragging**: Precisely position decals by dragging them
 - **Color Customization**: Choose from a variety of colors for the model
 - **Custom Image Upload**: Upload your own images to use as decals
@@ -19,17 +20,24 @@ A powerful 3D model customization tool built with React, Three.js, and related l
    - Toggle between model rotation and decal movement modes
    - Select colors to change the model appearance
 
-2. **Decal Controls**:
-   - Choose from pre-made decals or upload your own image
+2. **Decal Position Selection** (Shirt model only):
+   - Choose between Front, Left Shoulder, and Right Shoulder positions
+   - Each position can have its own decal (built-in or custom uploaded)
+
+3. **Decal Controls**:
+   - Choose from pre-made decals or upload your own image for the selected position
    - When decal movement is ON: Click and drag to position decals on the model
    - When decal movement is OFF: Click and drag to rotate the model
+   - Remove decals from specific positions as needed
 
-3. **Utilities**:
+4. **Utilities**:
    - Download your customized design as an image
    - Toggle debug mode for advanced users
 
 ## Technical Implementation
 
+- **Multi-Position Decal System**: Support for multiple decals at predefined positions with independent control
+- **Position-Specific State Management**: Each decal position maintains its own state (visibility, image, position, rotation, scale)
 - **Raycasting**: Decals can be placed anywhere on the model using raycasting to determine surface intersection points
 - **Surface Normal Alignment**: Decals automatically align with the surface normal for proper orientation
 - **Local Coordinate System**: Decals maintain their position during model rotation by using local model coordinates
@@ -57,6 +65,15 @@ A powerful 3D model customization tool built with React, Three.js, and related l
 - `src/ControlPanel.js`: UI controls for model customization
 - `src/store.js`: Global state management
 - `src/Overlay.js`: UI overlay components
+- `src/DecalManipulator.js`: Component for manipulating decals (scale, rotate, position)
+
+## Latest Updates
+
+- Added multi-position decal support for the t-shirt model
+- Implemented independent control for each decal position
+- Enhanced the UI with position selector buttons
+- Improved state management for better decal handling
+- Fixed various bugs related to decal positioning and rendering
 
 ## Credits
 
